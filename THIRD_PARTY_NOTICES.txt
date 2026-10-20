@@ -530,7 +530,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ================================================================================
-electron@43.2.0
+electron@43.8.1
 Declared license: MIT
 Selected license: MIT
 Source: https://github.com/electron/electron
@@ -957,7 +957,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ================================================================================
-js-yaml@4.3.1
+js-yaml@4.3.2
 Declared license: MIT
 Selected license: MIT
 Source: nodeca/js-yaml

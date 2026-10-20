@@ -1,6 +1,6 @@
 {
   "name": "@codedoc/app",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "离线生成符合软件著作权申报规范的源程序文档",
   "license": "Apache-2.0",
@@ -105,7 +105,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "43.2.0",
+    "electron": "^43.8.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "react": "^18.3.1",
