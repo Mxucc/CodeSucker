@@ -107,6 +107,18 @@ function cleanOptions(value: unknown): CleanOptions {
   };
 }
 
+/**
+ * 输出目录不能就是项目根目录本身：否则导出的 docx/pdf/txt 会散落在源码旁，
+ * 下一次扫描会把它们当作待整理内容读进来，用户看到的文件列表里凭空多出非源码文件。
+ * 允许项目内的子目录（例如默认的「软著申报」），因为它已被扫描规则排除。
+ */
+function exportDir(root: string, outDir: string): string {
+  if (outDir === root) {
+    throw new Error('输出目录不能是项目根目录本身，请选择项目下的子目录或项目外的目录');
+  }
+  return outDir;
+}
+
 function processPayload(value: unknown, requireDocumentMetadata = false): ProcessPayload {
   if (!isRecord(value)) throw new Error('处理请求无效');
   const foundedDate = optionalText(value.foundedDate, '成立日期');
@@ -152,7 +164,7 @@ export function parseExportRequest(value: unknown): JobRequest<ExportPayload> {
     jobId: identifier(value.jobId, 'jobId'),
     payload: {
       ...payload,
-      outDir: absolutePath(value.payload.outDir, '输出目录'),
+      outDir: exportDir(payload.root, absolutePath(value.payload.outDir, '输出目录')),
       formats: { pdf: formats.pdf, docx: formats.docx, txt: formats.txt },
       pdfPreviewKey: formats.pdf ? pdfPreviewKey as string : undefined,
     },

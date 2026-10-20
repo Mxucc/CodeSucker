@@ -204,6 +204,13 @@ function requireCurrentScan(root: string, scanSessionId: string) {
 
 function orderedEntries(payload: ProcessPayload): FileEntry[] {
   const scan = requireCurrentScan(payload.root, payload.scanSessionId);
+  // 扫描结果里的 included 恒为 true，用户实际的勾选状态只体现在 orderedRelPaths 上。
+  // 这里按入选集合重新标记，否则下游审计（如「文件修改时间早于成立日期」）会把
+  // 用户已经取消勾选的文件也算进告警，误导用户去准备不必要的《前期开发说明》。
+  const selected = new Set(payload.orderedRelPaths);
+  for (const [relPath, entry] of scan.byRel) {
+    entry.included = selected.has(relPath);
+  }
   return payload.orderedRelPaths
     .map((relativePath) => scan.byRel.get(relativePath))
     .filter((entry): entry is FileEntry => !!entry);

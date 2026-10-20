@@ -45,6 +45,16 @@ function createWindow() {
     updateService?.scheduleAutomaticCheck();
   });
 
+  // 导航与新窗口兜底：CSP 是唯一的前端防线，一旦 renderer 出现 XSS，
+  // 没有这两处拦截就可以把窗口导航到外部页面，或以新窗口打开任意地址。
+  // 应用是单页本地界面，除自身渲染入口外不应发生任何导航。
+  createdWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  createdWindow.webContents.on('will-navigate', (event, url) => {
+    const current = createdWindow.webContents.getURL();
+    if (url !== current) event.preventDefault();
+  });
+  createdWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
+
   if (process.env.ELECTRON_RENDERER_URL) {
     createdWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  PDF_LAYOUT_VERSION, renderPdfHtml, type Page, type PdfTemplateOptions,
+  PDF_LAYOUT_VERSION, renderPdfHtml, uniqueOutputPath, type Page, type PdfTemplateOptions,
 } from '@codedoc/core';
 
 export interface PdfDocument {
@@ -95,6 +95,13 @@ export class PdfRenderer {
         backgroundThrottling: false,
       },
     });
+    // 隐藏窗口只用于把本应用生成的 HTML 打印成 PDF，不允许它再打开窗口或跳到外部页面。
+    // 内容来自用户源码文本，虽然做了转义，兜底拦截仍应存在。
+    created.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    created.webContents.on('will-navigate', (event, url) => {
+      if (!url.startsWith('data:text/html')) event.preventDefault();
+    });
+    created.webContents.on('will-attach-webview', (event) => event.preventDefault());
     created.on('closed', () => {
       if (this.window === created) this.window = null;
     });
@@ -105,7 +112,8 @@ export class PdfRenderer {
 
 export async function writePdfAtomic(buffer: Buffer, outDir: string, title: string): Promise<string> {
   await fs.promises.mkdir(outDir, { recursive: true });
-  const file = path.join(outDir, `源程序_${sanitize(title)}.pdf`);
+  // 与 docx/txt 共用同一套不覆盖命名，避免重复导出时静默覆盖上一版材料。
+  const file = uniqueOutputPath(outDir, `源程序_${title}`, '.pdf');
   const temporary = path.join(outDir, `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`);
   try {
     await fs.promises.writeFile(temporary, buffer, { mode: 0o600 });
@@ -124,8 +132,4 @@ export async function writePdfAtomic(buffer: Buffer, outDir: string, title: stri
     await fs.promises.unlink(temporary).catch(() => undefined);
     throw error;
   }
-}
-
-function sanitize(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || '未命名';
 }

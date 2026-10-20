@@ -34,4 +34,11 @@ assert.match(rendererHtml, /frame-src 'self' blob:/, 'PDF 预览只能额外允�
 assert.match(rendererHtml, /object-src 'none'/, '不得开放 object/embed 插件内容');
 assert.doesNotMatch(rendererHtml, /script-src[^>]*'unsafe-eval'/, 'CSP 不得允许 unsafe-eval');
 
+// 导航与新窗口兜底：仅靠 CSP 不足以阻止窗口被导航到外部页面。
+assert.match(mainSource, /setWindowOpenHandler\(\(\)\s*=>\s*\(\{\s*action:\s*'deny'/, '主窗口必须拒绝所有新窗口');
+assert.match(mainSource, /'will-navigate'/, '主窗口必须拦截外部导航');
+assert.match(mainSource, /'will-attach-webview'/, '主窗口不得挂载 webview');
+assert.match(pdfRendererSource, /setWindowOpenHandler\(\(\)\s*=>\s*\(\{\s*action:\s*'deny'/, 'PDF 隐藏窗口必须拒绝所有新窗口');
+assert.match(pdfRendererSource, /'will-navigate'/, 'PDF 隐藏窗口必须限制导航来源');
+
 console.log('✅ Electron security policy 全部通过');

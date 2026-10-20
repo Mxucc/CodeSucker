@@ -34,14 +34,40 @@ const SYNTAX_BY_EXT: Record<string, CommentSyntax> = {
 
 const MASK_RULES: Array<{ re: RegExp; replace: (m: RegExpExecArray) => string }> = [
   {
-    // key = "value" 形式的密钥/口令
-    re: /((?:api[_-]?key|secret|token|passwd|password|access[_-]?key)\s*[:=]\s*["'])([^"']{4,})(["'])/gi,
+    // key = "value" 形式的密钥/口令。用显式前缀词表覆盖 private_key / appSecret / db_passwd 等命名；
+    // 不能用 [A-Za-z0-9]+[_-] 这类泛化前缀，否则「private_key」会被拆成 private_ + key 后整体不匹配。
+    re: /((?:(?:private|public|secret|access|api|app|db|master|admin|client)[_-]?)?(?:api[_-]?key|key|secret|token|passwd|password|credential)s?\s*[:=]\s*["'])([^"']{4,})(["'])/gi,
     replace: (m) => m[1] + m[2].slice(0, 2) + '****' + m[3],
   },
   {
-    // sk-/ghp_/AKIA 等平台密钥前缀
-    re: /\b((?:sk|pk|ghp|gho|glpat|AKIA|ASIA)[-_][A-Za-z0-9_-]{8,})\b/g,
+    // 连接串内嵌密码：scheme://user:password@host。必须排在通用赋值规则之前，
+    // 否则 password@host 会先被当成 key:value 吃掉，真正的密码段反而漏脱敏。
+    re: /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi,
+    replace: (m) => m[1] + m[2].slice(0, 2) + '****' + m[3],
+  },
+  {
+    // 未加引号的赋值：YAML「password: xxx」、.env「DB_PASSWORD=xxx」、配置对象「token: xxx」。
+    // 只吃单行 token，遇到空白/逗号/分号/右括号即停，避免把后续代码一起吞掉；允许 { } [ ] 包裹。
+    re: /((?:api[_-]?key|secret|token|passwd|password|access[_-]?key)[A-Za-z0-9_.-]*\s*[:=]\s*[{\[]?\s*)(?!["'\s])([^\s,;)}\]]{4,})/gi,
+    replace: (m) => m[1] + m[2].slice(0, 2) + '****',
+  },
+  {
+    // sk-/ghp_/glpat- 等带分隔符的平台密钥前缀
+    re: /\b((?:sk|pk|ghp|gho|glpat)[-_][A-Za-z0-9_-]{8,})\b/g,
     replace: (m) => m[1].slice(0, 5) + '****',
+  },
+  {
+    // AWS AccessKey ID：AKIA/ASIA 后直接跟 16 位大写字母数字，中间没有分隔符，
+    // 旧规则要求「AKIA[-_]...」导致真实 Key ID 永远匹配不上。
+    re: /\b((?:AKIA|ASIA)[A-Z0-9]{16})\b/g,
+    replace: (m) => m[1].slice(0, 4) + '****',
+  },
+  {
+    // 云厂商长密钥：AWS Secret、阿里云/腾讯云 AccessKey Secret。
+    // 不能「见到长串就脱敏」——那会误伤 SHA-256 哈希、Base64 常量和长标识符，
+    // 所以要求「密钥语境（前缀含 KEY/SECRET/TOKEN/PASSWORD 等词）+ 高熵（字母与数字混合）」。
+    re: /((?:KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE)[A-Z0-9_]*\s*[:=]\s*["']?)(?=[A-Za-z0-9/+]*\d)(?=[A-Za-z0-9/+]*[A-Za-z])[A-Za-z0-9/+]{32,}={0,2}/gi,
+    replace: (m) => m[1] + m[0].slice(m[1].length, m[1].length + 4) + '****',
   },
   {
     // 内网 IP
@@ -49,9 +75,19 @@ const MASK_RULES: Array<{ re: RegExp; replace: (m: RegExpExecArray) => string }>
     replace: () => '10.0.*.*',
   },
   {
+    // 大陆身份证号（18 位，末位可为 X）
+    re: /\b\d{6}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b/g,
+    replace: (m) => m[0].slice(0, 6) + '********' + m[0].slice(14),
+  },
+  {
     // 大陆手机号
     re: /\b1[3-9]\d{9}\b/g,
     replace: (m) => m[0].slice(0, 3) + '********',
+  },
+  {
+    // 邮箱
+    re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    replace: (m) => m[0][0] + '****@' + (m[0].split('@')[1] ?? ''),
   },
 ];
 
@@ -248,12 +284,19 @@ function maskLine(line: string): { text: string; masked: boolean } {
     let m: RegExpExecArray | null;
     let result = '';
     let last = 0;
+    let ruleHit = false;
     while ((m = rule.re.exec(out)) !== null) {
-      masked = true;
+      ruleHit = true;
       result += out.slice(last, m.index) + rule.replace(m);
       last = m.index + m[0].length;
     }
-    if (masked && last > 0) out = result + out.slice(last);
+    // 必须按「本条规则是否命中」决定是否重建字符串：
+    // 若沿用跨规则的 masked 标志，前一条规则命中会让后续未命中的规则也走重建分支，
+    // 用空的 result 拼上 out.slice(0) 虽然当前等价，但一旦 last 语义变化就会静默丢字符。
+    if (ruleHit) {
+      out = result + out.slice(last);
+      masked = true;
+    }
   }
   return { text: out, masked };
 }

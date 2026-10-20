@@ -4,6 +4,9 @@ import {
 } from '../store';
 import { settleExportState } from '../export-state';
 
+/** 默认输出子目录，必须与 core 的 EXPORT_ARTIFACT_DIRS 保持一致，该目录已被扫描规则排除。 */
+const DEFAULT_EXPORT_DIR = '软著申报';
+
 export default function Step5Export() {
   const s = useStore();
   const p = s.processData;
@@ -38,7 +41,7 @@ export default function Step5Export() {
         title: s.swName,
         owner: s.owner,
         clean: cleanOptions(s.clean),
-        outDir: s.outDir || `${s.root}/软著申报`,
+        outDir: s.outDir || `${s.root}/${DEFAULT_EXPORT_DIR}`,
         formats: { pdf: s.fmtPdf, docx: s.fmtDocx, txt: s.fmtTxt },
         pdfPreviewKey: s.fmtPdf ? s.pdfPreviewKey ?? undefined : undefined,
       }, jobId);
@@ -84,7 +87,7 @@ export default function Step5Export() {
     `${location.file}${location.line ? `:${location.line}` : ''}`;
 
   const r = s.exportResult;
-  const displayedOutDir = s.outDir || `${s.root ?? ''}/软著申报`;
+  const displayedOutDir = s.outDir || `${s.root ?? ''}/${DEFAULT_EXPORT_DIR}`;
   const exportProgress = s.jobProgress?.jobKind === 'export' ? s.jobProgress : null;
   const exportLabel = exportProgress?.stage === 'cleaning' && exportProgress.total > 0
     ? `正在清洗 ${exportProgress.completed}/${exportProgress.total}`

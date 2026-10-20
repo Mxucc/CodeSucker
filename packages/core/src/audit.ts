@@ -68,11 +68,18 @@ export function audit(
       items.push({ status: 'pass', name: `每页行数均 ≥ ${lpp} 行`, detail: `共 ${pages.length} 页，${selection.truncated ? '每页恰好' : '除末页外每页'} ${lpp} 行` });
     }
 
-    // 4. 末页 2/3
+    // 4. 末页 2/3：按产品契约（README 与 docs/02）这是「警告」级提示，不是退回风险，
+    //    因此保持 warn，不阻断导出；提示语要给出可执行的补救动作。
+    //    例外：只有 1 页时「末页」就是全部内容，2/3 规则没有意义，否则小项目会被误导。
     const last = pages[pages.length - 1];
-    if (last.lines.length < Math.ceil((lpp * 2) / 3)) {
-      items.push({ status: 'warn', name: `末页仅 ${last.lines.length} 行，不足页面 2/3`, detail: '建议补充或调整截取点，避免末页过短被认定为凑页' });
-    } else {
+    const minLastLines = Math.ceil((lpp * 2) / 3);
+    if (pages.length > 1 && last.lines.length < minLastLines) {
+      items.push({
+        status: 'warn',
+        name: `末页仅 ${last.lines.length} 行，不足页面 2/3`,
+        detail: `末页建议至少 ${minLastLines} 行（每页 ${lpp} 行的 2/3）。可补充代码或调整截取点，避免末页过短被认定为凑页。`,
+      });
+    } else if (pages.length > 1) {
       items.push({ status: 'pass', name: '末页行数满足 2/3 要求', detail: `末页 ${last.lines.length} 行` });
     }
 

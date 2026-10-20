@@ -17,6 +17,20 @@ export interface RenderOptions {
 }
 
 /**
+ * 计算不覆盖已有文件的输出路径：同名已存在时追加 `_2`、`_3`……
+ * 申报材料通常要按不同截取范围反复导出，静默覆盖会让用户拿不到上一版，也无法回退。
+ */
+export function uniqueOutputPath(outDir: string, baseName: string, extension: string): string {
+  const safeBase = baseName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || '未命名';
+  const ext = extension.startsWith('.') ? extension : `.${extension}`;
+  let candidate = path.join(outDir, `${safeBase}${ext}`);
+  for (let index = 2; fs.existsSync(candidate) && index < 1000; index++) {
+    candidate = path.join(outDir, `${safeBase}_${index}${ext}`);
+  }
+  return candidate;
+}
+
+/**
  * 生成 docx：
  * - 页眉左侧软件名称+版本号，右侧「第 X 页」自动页码
  * - 每行一个段落，固定 12pt 行距（Exactly），字体宋体 10.5pt
@@ -77,14 +91,14 @@ export async function renderDocx(pages: Page[], opts: RenderOptions): Promise<st
 
   const buf = await Packer.toBuffer(doc);
   fs.mkdirSync(opts.outDir, { recursive: true });
-  const file = path.join(opts.outDir, `${opts.baseName ?? '源程序_' + sanitize(opts.title)}.docx`);
+  const file = uniqueOutputPath(opts.outDir, outputBaseName(opts), '.docx');
   fs.writeFileSync(file, buf);
   return file;
 }
 
 export function renderTxt(pages: Page[], opts: RenderOptions): string {
   fs.mkdirSync(opts.outDir, { recursive: true });
-  const file = path.join(opts.outDir, `${opts.baseName ?? '源程序_' + sanitize(opts.title)}.txt`);
+  const file = uniqueOutputPath(opts.outDir, outputBaseName(opts), '.txt');
   const text = pages.map((p) => p.lines.join('\n')).join('\n');
   fs.writeFileSync(file, text, 'utf8');
   return file;
@@ -92,12 +106,13 @@ export function renderTxt(pages: Page[], opts: RenderOptions): string {
 
 export async function renderTxtAsync(pages: Page[], opts: RenderOptions): Promise<string> {
   await fs.promises.mkdir(opts.outDir, { recursive: true });
-  const file = path.join(opts.outDir, `${opts.baseName ?? '源程序_' + sanitize(opts.title)}.txt`);
+  const file = uniqueOutputPath(opts.outDir, outputBaseName(opts), '.txt');
   const text = pages.map((p) => p.lines.join('\n')).join('\n');
   await fs.promises.writeFile(file, text, 'utf8');
   return file;
 }
 
-function sanitize(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || '未命名';
+/** 三种格式共用同一主文件名，保证一次导出的 pdf/docx/txt 名称成组一致。 */
+function outputBaseName(opts: RenderOptions): string {
+  return opts.baseName ?? `源程序_${opts.title}`;
 }

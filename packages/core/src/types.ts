@@ -143,10 +143,16 @@ export interface FileTaskError {
   message: string;
 }
 
+/** 本工具自己的产物目录与配置文件，扫描时必须排除，否则再次扫描会把自己的输出当成源码。 */
+export const EXPORT_ARTIFACT_DIRS = ['软著申报'];
+export const PROJECT_CONFIG_NAME = '.codedoc.json';
+
 export const DEFAULT_EXCLUDES = [
   'node_modules', 'dist', 'build', 'out', 'vendor', 'target',
   '.git', '.gradle', '.idea', '.vscode', '.next', '.nuxt',
   '__pycache__', 'venv', '.venv', 'coverage', 'Pods',
+  ...EXPORT_ARTIFACT_DIRS,
+  PROJECT_CONFIG_NAME,
   '*.min.js', '*.min.css', '*.lock',
 ];
 

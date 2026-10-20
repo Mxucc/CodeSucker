@@ -6,7 +6,7 @@ export {
 } from './discover.ts';
 export { annotate, cleanFile, extractAttributions, wrapLine } from './clean.ts';
 export { select } from './select.ts';
-export { renderDocx, renderTxt, renderTxtAsync, type RenderOptions } from './render.ts';
+export { renderDocx, renderTxt, renderTxtAsync, uniqueOutputPath, type RenderOptions } from './render.ts';
 export {
   PDF_LAYOUT_VERSION, SOURCE_CODE_LINE_HEIGHT_PT, renderPdfHtml, type PdfTemplateOptions,
 } from './pdf-template.ts';
